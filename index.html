@@ -104,7 +104,7 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
       <div id="stage">
         <video id="v" playsinline preload="metadata"></video><audio id="au" preload="auto"></audio>
         <div id="nov">「영상」 → 「자막」 순서로 고르세요<br>자막: srt · vtt · smi · ass (한영 통합 자막·2개 동시 가능)</div>
-        <div id="mute" hidden><div style="flex:1"><span id="muteTx"></span><div class="g"><button id="muteFix">소리 살리기</button><button id="muteX">닫기</button></div></div></div>
+        <div id="mute" hidden><div style="flex:1"><span id="muteTx"></span><div class="g"><button id="muteFix">소리 살리기</button><button id="muteSub">내장 자막 꺼내기</button><button id="muteX">닫기</button></div></div></div>
         <div id="conv" hidden><div class="r"><b id="cvT">소리 변환 준비 중…</b><button id="cvX">취소</button></div><div class="pb"><i id="cvB"></i></div><div class="r"><span id="cvL"></span><span id="cvR"></span></div></div>
         <div id="cap"></div>
       </div>
@@ -123,7 +123,7 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
         <button id="oSm">싱−</button><button id="oS" disabled>0.0초</button><button id="oSp">싱+</button>
         <span class="lb">글색</span><span id="ccs"></span>
         <span class="lb">줄색</span><span id="hls"></span>
-        <span class="lb">소리</span><button id="aConv">변환</button><button id="aSave" disabled>저장</button><button id="aoSm">소싱−</button><button id="aoS" disabled>0.0초</button><button id="aoSp">소싱+</button>
+        <span class="lb">내장 자막</span><button id="sExt">꺼내기</button><span class="lb">소리</span><button id="aConv">변환</button><button id="aSave" disabled>저장</button><button id="aoSm">소싱−</button><button id="aoS" disabled>0.0초</button><button id="aoSp">소싱+</button>
         <button id="cHide">자막 끄기</button><button id="cKey">key</button>
       </div>
       <div id="keys" hidden>스페이스 재생/정지 · ←/→ 5초 · ,/. 이전/다음 자막 · R 자막 반복 · B 구간 A-B · 1/2/3 한/영/둘 · F 전체화면 · 영상 두 번 탭 = 영상만 크게</div>
@@ -164,17 +164,19 @@ function openVideo(f){
   v.play().catch(()=>{})}
 $('#fs').onchange=async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length)return;
   if(!v.src)toast('영상을 먼저 고르면 더 좋아요');
-  let msg=[];
-  for(const f of fs.slice(0,2)){
-    const t=(await readText(f)).replace(/^﻿/,'');
+  const items=[];for(const f of fs.slice(0,2))items.push({name:f.name,text:await readText(f)});loadSubs(items)};
+function loadSubs(items,quiet){let msg=[];
+  for(const it of items){
+    const t=it.text.replace(/^\uFEFF/,'');
     const raw=/\[Script Info\]|^Dialogue:/mi.test(t)?parseAss(t):/<sync/i.test(t)?parseSmi(t):parseSrt(t);
     const sp=splitLang(raw);
-    if(!sp.ko.length&&!sp.en.length){msg.push(f.name+': 읽지 못함');continue}
-    if(sp.ko.length){T.ko=sp.ko;names.ko=f.name}
-    if(sp.en.length){T.en=sp.en;names.en=f.name}
+    if(!sp.ko.length&&!sp.en.length){msg.push(it.name+': 읽지 못함');continue}
+    if(sp.ko.length){T.ko=sp.ko;names.ko=it.name}
+    if(sp.en.length){T.en=sp.en;names.en=it.name}
     msg.push((sp.ko.length&&sp.en.length?'한영 통합 ':sp.ko.length?'한글 ':'영어 ')+(sp.ko.length||sp.en.length)+'줄')}
-  if(T.ko.length&&T.en.length&&fs.length>0&&mode!=='both'&&!ld('sp_mode_set',0))mode='both';
-  ci=-2;rebuild();showName();setTab('sub');upsertRecent({subs:[names.en,names.ko].filter(Boolean)});toast(msg.join(' · '),2500)};
+  if(T.ko.length&&T.en.length&&mode!=='both'&&!ld('sp_mode_set',0))mode='both';
+  ci=-2;rebuild();showName();setTab('sub');upsertRecent({subs:[names.en,names.ko].filter(Boolean)});if(!quiet)toast(msg.join(' · '),2500);return msg}
+window.__loadSubs=loadSubs;
 function showName(){$('#fname').textContent=[vname,names.en,names.ko!==names.en?names.ko:''].filter(Boolean).join(' + ')||'영상과 자막 파일을 고르세요'}
 async function readText(f){const b=await f.arrayBuffer();try{return new TextDecoder('utf-8',{fatal:true}).decode(b)}catch(e){try{return new TextDecoder('euc-kr').decode(b)}catch(e2){return new TextDecoder().decode(b)}}}
 
@@ -275,7 +277,7 @@ function tick(){const d=v.duration,t=v.currentTime,p=d?t/d:0;
   requestAnimationFrame(tick)}
 requestAnimationFrame(tick);
 function checkAudio(){const n=v.webkitAudioDecodedByteCount,noA=(n===0)||(v.mozHasAudio===false)||(v.audioTracks&&v.audioTracks.length===0);
-  if(noA&&!v.muted){$('#muteTx').textContent='🔇 이 영상의 소리 형식(AC3·DTS 등, 주로 mkv)은 크롬이 재생하지 못해요. 「소리 살리기」를 누르면 폰 안에서 소리만 바꿔 영상과 맞춰 재생합니다(40분 영상 몇 분, 한 번 바꾸면 저장돼서 다음엔 바로).';$('#mute').hidden=false}}
+  if(noA&&!v.muted){$('#muteTx').textContent='🔇 이 영상의 소리 형식(AC3·DTS 등, 주로 mkv)은 크롬이 재생하지 못해요. 「소리 살리기」를 누르면 폰 안에서 소리를 바꿔 영상과 맞춰 재생합니다. 안에 든 자막도 같이 꺼냅니다(40분 영상 몇 분, 한 번 하면 저장돼서 다음엔 바로).';$('#mute').hidden=false}}
 $('#muteX').onclick=()=>$('#mute').hidden=true;
 function drawTicks(){const T2=$('#ticks');T2.innerHTML='';if(base.length&&v.duration){const step=Math.max(1,Math.ceil(base.length/200));
   for(let i=0;i<base.length;i+=step){const e=document.createElement('i');e.style.left=(base[i].s+off)/v.duration*100+'%';T2.appendChild(e)}}drawAB()}
@@ -332,7 +334,9 @@ window.__idbDel=k=>idbDel(k);async function idbDel(k){try{const d=await idb();d.
 function detachAudio(){if(ext){au.pause();au.removeAttribute('src');au.load();URL.revokeObjectURL(ext)}ext=null;extBlob=null;v.muted=false;$('#aBadge').hidden=true;$('#aSave').disabled=true}
 function attachAudio(blob){detachAudio();extBlob=blob;ext=URL.createObjectURL(blob);au.src=ext;au.playbackRate=speed;v.muted=true;$('#aBadge').hidden=false;$('#aSave').disabled=false;$('#mute').hidden=true;audioChecked=true;
   au.currentTime=Math.max(0,v.currentTime+aoff);if(!v.paused)au.play().catch(()=>{})}
-window.__onVideoOpen=async(key)=>{detachAudio();const b=await idbGet(key);if(b&&key===vk){attachAudio(b);toast('저장해 둔 변환 소리로 재생',2500)}};
+window.__onVideoOpen=async(key)=>{detachAudio();const b=await idbGet(key);if(b&&key===vk){attachAudio(b);toast('저장해 둔 변환 소리로 재생',2500)}
+  const ss=await idbGet(key+'|subs');if(ss&&key===vk){try{const m=loadSubs(JSON.parse(ss),true);setTimeout(()=>toast('저장해 둔 내장 자막 · '+m.join(' · '),3000),2600)}catch(e){}}
+  else if(/\.(mkv|webm|mp4|m4v|mov)$/i.test(vname))setTimeout(()=>{if(key===vk&&!T.ko.length&&!T.en.length)toast('자막 파일이 없으면 ⋯ → 내장 자막 「꺼내기」',3500)},3200)};
 // 영상↔소리 맞추기
 const want=()=>v.currentTime+aoff;
 v.addEventListener('play',()=>{if(ext){au.currentTime=Math.max(0,want());au.play().catch(()=>{})}});
@@ -347,34 +351,55 @@ $('#aoSm').onclick=()=>setAo(-.1);$('#aoSp').onclick=()=>setAo(.1);setAo(0);
 // 변환
 let curFile=null;window.__setFile=f=>curFile=f;
 function cvShow(t,p,l,r){$('#conv').hidden=false;if(t!=null)$('#cvT').textContent=t;if(p!=null)$('#cvB').style.width=Math.max(0,Math.min(100,p))+'%';if(l!=null)$('#cvL').textContent=l;if(r!=null)$('#cvR').textContent=r}
-async function convert(){if(!curFile)return toast('먼저 「영상」을 고르세요');if(ffBusy)return toast('이미 변환 중이에요');
-  ffBusy=true;$('#mute').hidden=true;const file=curFile,key=vk,t0=Date.now();let lastP=0,lastAt=Date.now(),dur=v.duration||0;
-  cvShow('소리 변환 엔진 받는 중… (처음 1번 31MB)',0,'','');
+const TXT=/^(subrip|srt|ass|ssa|mov_text|webvtt|text|microdvd|subviewer)$/;
+async function convert(want={audio:true,subs:true}){if(!curFile)return toast('먼저 「영상」을 고르세요');if(ffBusy)return toast('이미 변환 중이에요');
+  ffBusy=true;$('#mute').hidden=true;const file=curFile,key=vk,t0=Date.now();let lastP=0,lastAt=Date.now(),dur=v.duration||0,label='';
+  cvShow('변환 엔진 받는 중… (처음 1번 31MB)',0,'','');
   clearInterval(cvTimer);cvTimer=setInterval(()=>{const el=(Date.now()-t0)/1000;const still=(Date.now()-lastAt)/1000;
     let r='';if(lastP>0.02){const tot=el/lastP;r='남은 약 '+fmt(tot-el)}else if(still>20)r='처리 중 (멈춘 것 아님)';cvShow(null,null,'지난 '+fmt(el),r)},1000);
   try{
     if(!ff){ff=new FFmpeg();const base=new URL('./ffmpeg/core/',location.href).href;await ff.load({coreURL:base+'ffmpeg-core.js',wasmURL:base+'ffmpeg-core.wasm'})}
-    cvShow('소리 변환 중… 0%',0);
-    const onP=({time})=>{if(!dur)return;const p=Math.min(1,(time/1e6)/dur);if(p>lastP){lastP=p;lastAt=Date.now()}cvShow('소리 변환 중… '+Math.round(p*100)+'%',p*100)};
-    const onL=({message})=>{const m=/time=(\d+):(\d+):([\d.]+)/.exec(message);if(m&&dur){const sec=+m[1]*3600+ +m[2]*60+ +m[3];onP({time:sec*1e6})}
-      if(!dur){const d=/Duration: (\d+):(\d+):([\d.]+)/.exec(message);if(d)dur=+d[1]*3600+ +d[2]*60+ +d[3]}};
-    ff.on('progress',onP);ff.on('log',onL);
     try{await ff.createDir('/in')}catch(e){}
-    await ff.mount('WORKERFS',{files:[file]},'/in');
-    const rc=await ff.exec(['-hide_banner','-i','/in/'+file.name,'-map','0:a:0','-vn','-sn','-dn','-ac','2','-c:a','aac','-b:a','128k','-f','mp4','/out.m4a']);
+    try{await ff.unmount('/in')}catch(e){}
+    await ff.mount('WORKERFS',{files:[file]},'/in');const inp='/in/'+file.name;
+    // 1) 안에 든 트랙 살펴보기 (머리 부분만 읽어 빠름)
+    cvShow('파일 안 트랙 살펴보는 중…',1);const logs=[];const grab=({message})=>logs.push(message);ff.on('log',grab);
+    await ff.exec(['-hide_banner','-i',inp]);ff.off('log',grab);
+    const st=[];for(const l of logs){const m=/Stream #0:(\d+)(?:\[[^\]]*\])?(?:\((\w+)\))?: (Audio|Subtitle): (\w+)/.exec(l);if(m)st.push({i:+m[1],lang:(m[2]||'').toLowerCase(),type:m[3],codec:m[4]});
+      if(!dur){const d=/Duration: (\d+):(\d+):([\d.]+)/.exec(l);if(d)dur=+d[1]*3600+ +d[2]*60+ +d[3]}}
+    const hasA=st.some(x=>x.type==='Audio'),subT=st.filter(x=>x.type==='Subtitle'&&TXT.test(x.codec)),subI=st.filter(x=>x.type==='Subtitle'&&!TXT.test(x.codec));
+    let pick=[];if(want.subs&&subT.length){const ko=subT.find(x=>/^(kor|ko)$/.test(x.lang)),en=subT.find(x=>/^(eng|en)$/.test(x.lang));pick=[ko,en].filter(Boolean);if(!pick.length)pick=subT.slice(0,2)}
+    const doA=want.audio&&hasA;
+    const notes=[];if(want.subs&&!subT.length)notes.push(subI.length?'내장 자막이 그림 자막('+subI[0].codec+')이라 글자로 못 꺼냄':'내장 자막 없음');
+    if(want.audio&&!hasA)notes.push('소리 트랙 없음');
+    if(!doA&&!pick.length)throw new Error(notes.join(' · ')||'꺼낼 것이 없어요');
+    label=doA&&pick.length?'소리·자막 꺼내는 중':doA?'소리 변환 중':'자막 꺼내는 중';
+    // 2) 한 번 훑으면서 소리·자막 함께 꺼내기
+    const args=['-hide_banner','-i',inp];
+    if(doA)args.push('-map','0:a:0','-vn','-sn','-dn','-ac','2','-c:a','aac','-b:a','128k','-f','mp4','/out.m4a');
+    for(const p of pick)args.push('-map','0:'+p.i,'-c:s','srt','-f','srt','/s'+p.i+'.srt');
+    cvShow(label+'… 0%',0);
+    const onP=({time})=>{if(!dur)return;const p=Math.min(1,(time/1e6)/dur);if(p>lastP){lastP=p;lastAt=Date.now()}cvShow(label+'… '+Math.round(p*100)+'%',p*100)};
+    const onL=({message})=>{const m=/time=(\d+):(\d+):([\d.]+)/.exec(message);if(m&&dur){onP({time:(+m[1]*3600+ +m[2]*60+ +m[3])*1e6})}};
+    ff.on('progress',onP);ff.on('log',onL);
+    const rc=await ff.exec(args);
     ff.off('progress',onP);ff.off('log',onL);
     try{await ff.unmount('/in')}catch(e){}
-    if(rc!==0)throw new Error('변환 실패 (소리 트랙이 없거나 읽을 수 없는 형식)');
-    const data=await ff.readFile('/out.m4a');try{await ff.deleteFile('/out.m4a')}catch(e){}
-    const blob=new Blob([data.buffer],{type:'audio/mp4'});
-    await idbPut(key,blob);
-    if(key===vk)attachAudio(blob);
-    cvShow('완료 — 변환 소리로 재생 ('+fmt((Date.now()-t0)/1000)+' 걸림)',100,'',(blob.size/1048576).toFixed(0)+'MB · 저장됨');
-    setTimeout(()=>$('#conv').hidden=true,4000);upsertRecent({conv:1});
-  }catch(e){if(e&&e.message==='cancel')cvShow('취소함',0,'','');else cvShow('⚠ '+(e&&e.message||e),null,'','다시 시도: ⋯ → 변환');
+    if(rc!==0)throw new Error('변환 실패 (읽을 수 없는 형식)');
+    const done=[];
+    if(pick.length){const items=[];for(const p of pick){try{const d=await ff.readFile('/s'+p.i+'.srt');await ff.deleteFile('/s'+p.i+'.srt');
+        const tx=new TextDecoder().decode(d);if(tx.trim())items.push({name:'내장 자막'+(p.lang?' ('+p.lang+')':''),text:tx})}catch(e){}}
+      if(items.length){await idbPut(key+'|subs',JSON.stringify(items));if(key===vk)done.push('자막 '+loadSubs(items,true).join(' · '))}
+      if(subT.length>pick.length)notes.push('다른 내장 자막 '+(subT.length-pick.length)+'개는 건너뜀')}
+    if(doA){const data=await ff.readFile('/out.m4a');try{await ff.deleteFile('/out.m4a')}catch(e){}
+      const blob=new Blob([data.buffer],{type:'audio/mp4'});await idbPut(key,blob);if(key===vk)attachAudio(blob);done.push('소리 '+(blob.size/1048576).toFixed(0)+'MB');upsertRecent({conv:1})}
+    cvShow('완료 ('+fmt((Date.now()-t0)/1000)+' 걸림) — '+done.join(' · '),100,notes.join(' · '),'저장됨');
+    setTimeout(()=>$('#conv').hidden=true,notes.length?7000:4000);
+  }catch(e){cvShow('⚠ '+(e&&e.message||e),null,'','');
     try{ff&&ff.terminate()}catch(_){}ff=null;setTimeout(()=>$('#conv').hidden=true,6000)}
   finally{clearInterval(cvTimer);ffBusy=false}}
-$('#muteFix').onclick=convert;$('#aConv').onclick=convert;
+$('#muteFix').onclick=()=>convert({audio:true,subs:true});$('#aConv').onclick=()=>convert({audio:true,subs:true});
+$('#muteSub').onclick=()=>convert({audio:false,subs:true});$('#sExt').onclick=()=>convert({audio:false,subs:true});
 $('#cvX').onclick=()=>{if(ff&&ffBusy){try{ff.terminate()}catch(e){}ff=null;ffBusy=false;clearInterval(cvTimer);cvShow('취소함',0,'','');setTimeout(()=>$('#conv').hidden=true,1500)}else $('#conv').hidden=true};
 $('#aSave').onclick=()=>{if(!extBlob)return;const d=new Date(),y=String(d.getFullYear()).slice(2)+p2(d.getMonth()+1)+p2(d.getDate());
   const a=document.createElement('a');a.href=ext;a.download=y+'_'+vname.replace(/\.[^.]+$/,'')+'_소리.m4a';document.body.appendChild(a);a.click();a.remove();toast('소리 파일 저장 → 다운로드 폴더',2500)};
