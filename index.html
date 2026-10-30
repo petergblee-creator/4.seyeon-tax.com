@@ -131,7 +131,7 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
         <div class="grow" id="cKeyRow" hidden><input id="cKeyIn" type="password" placeholder="Claude API 키 (sk-ant-…) 붙여넣기" autocomplete="off"><button id="cKeySv">저장</button><a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">키 받기 ↗</a></div>
         <div class="grow" id="gKeyRow"><input id="gKey" type="password" placeholder="Groq 키 (gsk_…) 붙여넣기" autocomplete="off"><button id="gKeySv">저장</button><a href="https://console.groq.com/keys" target="_blank" rel="noopener">키 받기 ↗</a></div>
         <div class="grow"><button id="gGo" class="tog">시작</button><button id="gTrOnly" hidden>번역만</button><div id="gPb"><i></i><b id="gPt">대기</b></div></div>
-        <div class="grow"><span class="gs">만든 자막은 자동 저장 · 파일로는 ⋯ → 「자막 저장」</span><button id="gKeyCh" hidden>Groq 키 지우기</button><button id="cKeyCh" hidden>Claude 키 지우기</button></div>
+        <div class="grow"><span class="gs">만든 자막·변환 소리 = 이 브라우저에 자동 보관(같은 영상 열면 자동) + 완성 때 다운로드 폴더에도 파일 자동 저장</span><button id="gKeyCh" hidden>Groq 키 지우기</button><button id="cKeyCh" hidden>Claude 키 지우기</button></div>
       </div>
       <div class="row">
         <button id="cP">▶</button><button id="cB">-5</button><button id="cF">+5</button>
@@ -148,7 +148,7 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
         <button id="cHide">자막 끄기</button><button id="cKey">key</button>
         <span class="lb" id="stInfo"></span><button id="stKeep">보관 고정</button>
       </div>
-      <div id="keys" hidden>스페이스 재생/정지 · ←/→ 5초 · ,/. 이전/다음 자막 · R 자막 반복 · B 구간 A-B · 1/2/3 한/영/둘 · G 자막 생성 창 · F 전체화면 · 영상 두 번 탭 = 영상만 크게</div>
+      <div id="keys" hidden>스페이스 재생/정지 · ←/→ 이전/다음 자막 (,/. 도 같음) · Shift+←/→ 5초 · R 자막 반복 · B 구간 A-B · 1/2/3 한/영/둘 · G 자막 생성 창 · F 전체화면 · 영상 두 번 탭 = 영상만 크게</div>
     </div>
     <div id="side">
       <div id="sbar"><span class="seg"><button id="tSub" class="tog">자막</button><button id="tRec">최근</button></span><input id="q" placeholder="🔍 검색 (초성 가능)"><span id="cnt"></span></div>
@@ -343,7 +343,7 @@ $('#cKey').onclick=()=>$('#keys').hidden=!$('#keys').hidden;
 const fs=()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen?.().catch(()=>toast('전체화면 불가'))};
 $('#bFs').onclick=fs;
 document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;const k=e.key;
-  if(k===' '){e.preventDefault();toggle()}else if(k==='ArrowLeft')v.currentTime-=5;else if(k==='ArrowRight')v.currentTime+=5;
+  if(k===' '){e.preventDefault();toggle()}else if(k==='ArrowLeft'){e.preventDefault();e.shiftKey?v.currentTime-=5:prevCue()}else if(k==='ArrowRight'){e.preventDefault();e.shiftKey?v.currentTime+=5:nextCue()}
   else if(k===',')prevCue();else if(k==='.')nextCue();else if(k==='r'||k==='R')setLoop();else if(k==='b'||k==='B')setAB();
   else if(k==='1')setMode('ko');else if(k==='2')setMode('en');else if(k==='3')setMode('both');else if(k==='f'||k==='F')fs()});
 // ---- 변환한 소리·내장 자막 (폰 안에서, ffmpeg.wasm) ----
@@ -466,7 +466,7 @@ async function convert(want={audio:true,subs:true}){if(!curFile)return toast('�
         const out=await ff.readFile('/out.m4a');try{await ff.deleteFile('/out.m4a')}catch(e){}
         const map={len:LEN,prime:1024/48000,n},blob=new Blob([out.buffer],{type:'audio/mp4'});
         await idbPut(key,blob);await idbPut(key+'|amap',map);await idbDel(key+'|aj');for(let i=0;i<n;i++)await idbDel(key+'|a'+i);
-        if(key===vk)attachAudio(blob,map);done.push('소리 '+(blob.size/1048576).toFixed(0)+'MB');upsertRecent({conv:1})}}
+        if(key===vk){attachAudio(blob,map);setTimeout(()=>$('#aSave').click(),1500)}keepStore();done.push('소리 '+(blob.size/1048576).toFixed(0)+'MB');upsertRecent({conv:1})}}
     try{await ff.unmount('/in')}catch(e){}
     if(!done.length)throw new Error(notes.join(' · ')||'꺼낼 것이 없어요');
     const msg='완료 ('+fmt((Date.now()-t0)/1000)+' 걸림) — '+done.join(' · ');
@@ -519,12 +519,12 @@ async function ocrSup(data,p,key){const ev=parseSup(data);if(!ev.length)return '
   return toSrt(ev.map((e,k)=>({s:e.start,e:e.end,x:res[k]})).filter(c=>c.x))}
 
 // ---- 자막 저장(srt) ----
-async function saveSubs(){if(!T.ko.length&&!T.en.length)return toast('저장할 자막이 없어요');
+async function saveSubs(auto){if(!T.ko.length&&!T.en.length)return toast('저장할 자막이 없어요');
   const d=new Date(),y=String(d.getFullYear()).slice(2)+p2(d.getMonth()+1)+p2(d.getDate()),nm=(vname||'자막').replace(/\.[^.]+$/,'');
   const sh=cs=>cs.map(c=>({s:Math.max(0,c.s+off),e:Math.max(0,c.e+off),x:c.x}));
   const out=[];if(T.en.length)out.push([y+'_'+nm+'_영어.srt',toSrt(sh(T.en))]);if(T.ko.length)out.push([y+'_'+nm+'_한글.srt',toSrt(sh(T.ko))]);
   for(const [n,t] of out){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+t],{type:'application/x-subrip'}));a.download=n;document.body.appendChild(a);a.click();a.remove();await new Promise(r=>setTimeout(r,400))}
-  toast(out.length+'개 저장 → 다운로드 폴더'+(off?' (싱크 '+off.toFixed(1)+'초 반영)':''),3000)}
+  toast((auto===true?'백업 · srt ':'')+out.length+'개 저장 → 다운로드 폴더'+(off?' (싱크 '+off.toFixed(1)+'초 반영)':''),3000)}
 $('#sSave').onclick=saveSubs;
 $('#aSave').onclick=()=>{if(!extBlob)return;const d=new Date(),y=String(d.getFullYear()).slice(2)+p2(d.getMonth()+1)+p2(d.getDate());
   const a=document.createElement('a');a.href=ext;a.download=y+'_'+vname.replace(/\.[^.]+$/,'')+'_소리.m4a';document.body.appendChild(a);a.click();a.remove();toast('소리 파일 저장 → 다운로드 폴더',2500)};
@@ -632,7 +632,7 @@ async function startGen(){if(!vk||!curFile)return toast('먼저 「영상」을 
       if(key===vk){T.en=job.en.slice();rebuild();genUI()}await genSave(job);set(1,lab+' 끝')}
     try{await ff.unmount('/ga')}catch(e){}try{await ff.unmount('/in')}catch(e){}
     if(gTrOn&&key===vk){T.ko=[];cvShow('한글 번역 중…',85);await translateFrom(0,sig,0.85,1);if(sig.aborted)throw new DOMException('','AbortError')}
-    job.fin=true;await genSave(job);upsertRecent({subs:['만든 자막']});
+    job.fin=true;await genSave(job);upsertRecent({subs:['만든 자막']});keepStore();if(key===vk)setTimeout(()=>saveSubs(true),800);
     const sec=Math.round((Date.now()-t0)/1000),msg='자막 완성 · 영 '+T.en.length+'줄'+(T.ko.length?' · 한 '+T.ko.length+'줄':'')+' · '+fmt(sec)+' 걸림';
     gp(1,msg);cvShow(msg,100,'같은 영상을 다시 열면 자동으로 불러와요','저장됨');notifyDone('자막 완성',vname+' — 영 '+T.en.length+'줄');setTimeout(()=>$('#conv').hidden=true,6000)}
   catch(e){if(e&&e.name==='AbortError'){gp(0,'중지함 — 끝낸 조각은 저장돼 「이어서」로 계속');cvShow('중지함 — 끝낸 조각은 저장돼 있어요',null,'','')}
