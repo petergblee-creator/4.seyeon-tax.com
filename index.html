@@ -83,8 +83,12 @@ body{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
 #list{flex:1;min-height:0;overflow-y:auto}
 .ln{display:flex;gap:8px;padding:5px 8px;border-bottom:1px solid var(--line);cursor:pointer}
 .ln .t{color:var(--sub);font-variant-numeric:tabular-nums;flex:0 0 auto;padding-top:1px}
-.ln .x{white-space:pre-line;min-width:0;overflow-wrap:anywhere}
-.ln .x small{display:block;color:var(--sub);font-size:11px}
+.ln .x{white-space:pre-line;min-width:0;overflow-wrap:anywhere;font-size:var(--lf,12px)}
+.ln .x small{display:block;color:var(--sub);font-size:calc(var(--lf,12px)*.9)}
+.ln .t{font-size:calc(var(--lf,12px)*.9)}
+.rc .n{font-size:var(--lf,12px)}
+@media(min-width:700px){#left>.row button{font-size:16px;padding:12px 14px;min-width:56px;border-radius:10px}#left>.row{gap:8px;padding:10px 8px}#left>.row#more button{font-size:14px;padding:9px 11px}#gen button{padding:9px 12px}}
+.rc{cursor:pointer}
 .ln.on{background:var(--hl);color:#000;font-weight:700}
 .ln.on .t,.ln.on .x small{color:#000}
 .rc{display:flex;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line)}
@@ -131,16 +135,16 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
         <div class="grow" id="cKeyRow" hidden><input id="cKeyIn" type="password" placeholder="Claude API 키 (sk-ant-…) 붙여넣기" autocomplete="off"><button id="cKeySv">저장</button><a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">키 받기 ↗</a></div>
         <div class="grow" id="gKeyRow"><input id="gKey" type="password" placeholder="Groq 키 (gsk_…) 붙여넣기" autocomplete="off"><button id="gKeySv">저장</button><a href="https://console.groq.com/keys" target="_blank" rel="noopener">키 받기 ↗</a></div>
         <div class="grow"><button id="gGo" class="tog">시작</button><button id="gTrOnly" hidden>번역만</button><div id="gPb"><i></i><b id="gPt">대기</b></div></div>
-        <div class="grow"><span class="gs">만든 자막·변환 소리 = 이 브라우저에 자동 보관(같은 영상 열면 자동) + 완성 때 다운로드 폴더에도 파일 자동 저장</span><button id="gKeyCh" hidden>Groq 키 지우기</button><button id="cKeyCh" hidden>Claude 키 지우기</button></div>
+        <div class="grow"><span class="gs">저장은 자동 — 앱 안 보관 + 완성 때 다운로드 폴더에 srt 자동 · 다시 받으려면 →</span><button id="gSrt">srt 저장</button><button id="gKeyCh" hidden>Groq 키 지우기</button><button id="cKeyCh" hidden>Claude 키 지우기</button></div>
       </div>
       <div class="row">
         <button id="cP">▶</button><button id="cB">-5</button><button id="cF">+5</button>
         <button id="cPr">문‹</button><button id="cNx">문›</button><button id="cLp" title="현재 자막 반복">반</button><button id="cAB" title="구간 반복: A 누르고 B 누르기">A-B</button>
         <button id="cSm">속−</button><button id="cS" disabled>1.0x</button><button id="cSp">속+</button>
-        <button id="cMore">⋯</button>
+        <button id="cCap" title="영상 위 자막 보이기/숨기기">자막</button><button id="cMore">⋯</button>
       </div>
       <div class="row" id="more" hidden>
-        <button id="zSm">자−</button><button id="zS" disabled>18</button><button id="zSp">자+</button>
+        <button id="zSm">자−</button><button id="zS" disabled>18</button><button id="zSp">자+</button><button id="lSm">목−</button><button id="lS" disabled>12</button><button id="lSp">목+</button>
         <button id="oSm">싱−</button><button id="oS" disabled>0.0초</button><button id="oSp">싱+</button>
         <span class="lb">글색</span><span id="ccs"></span>
         <span class="lb">줄색</span><span id="hls"></span>
@@ -148,7 +152,7 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
         <button id="cHide">자막 끄기</button><button id="cKey">key</button>
         <span class="lb" id="stInfo"></span><button id="stKeep">보관 고정</button>
       </div>
-      <div id="keys" hidden>스페이스 재생/정지 · ←/→ 이전/다음 자막 (,/. 도 같음) · Shift+←/→ 5초 · R 자막 반복 · B 구간 A-B · 1/2/3 한/영/둘 · G 자막 생성 창 · F 전체화면 · 영상 두 번 탭 = 영상만 크게</div>
+      <div id="keys" hidden>스페이스 재생/정지 · ←/→ 이전/다음 자막 (,/. 도 같음) · Shift+←/→ 5초 · R 자막 반복 · B 구간 A-B · 1/2/3 한/영/둘 · G 자막 생성 창 · C 영상 위 자막 보이기/숨기기 · F 전체화면 · 「최근」 줄 누르기 = 바로 재생 · 영상 두 번 탭 = 영상만 크게</div>
     </div>
     <div id="side">
       <div id="sbar"><span class="seg"><button id="tSub" class="tog">자막</button><button id="tRec">최근</button></span><input id="q" placeholder="🔍 검색 (초성 가능)"><span id="cnt"></span></div>
@@ -173,15 +177,40 @@ let vname='',vk='',tab='sub',recent=ld('sp_recent',[]);
 
 // ---- 파일 ----
 $('#fv').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;openVideo(f)};
-function openVideo(f){
+// ---- 최근 영상 바로 열기: ① 파일 위치 기억(핸들) ② 안 되면 앱 안에 영상 보관(OPFS, 최근 3개) ----
+const canPick=!!window.showOpenFilePicker;
+let rawPick=false;if(canPick)$('#fv').closest('label').addEventListener('click',async e=>{if(rawPick){rawPick=false;return}e.preventDefault();try{const [h]=await showOpenFilePicker({types:[{description:'영상',accept:{'video/*':['.mp4','.mkv','.webm','.mov','.m4v','.avi'],'audio/*':['.m4a','.mp3']}}]});const f=await h.getFile();openVideo(f,{handle:h})}catch(err){if(err&&err.name!=='AbortError'){rawPick=true;$('#fv').click()}}});
+const vid=k=>'v_'+Array.from(k).reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,7).toString(36);
+async function opfs(){try{return await navigator.storage.getDirectory()}catch(e){return null}}
+let keepJob=null;
+async function keepVideo(f,key,h){
+  if(h){await idbPut(key+'|h',h);upsertRecent({how:'h'});return}
+  const dir=await opfs();if(!dir||!navigator.storage)return;
+  try{await dir.getFileHandle(vid(key));upsertRecent({how:'o'});return}catch(e){}
+  try{const est=await navigator.storage.estimate();if(est.quota&&est.quota-est.usage<f.size*1.2+2e8){toast('폰 저장 공간 부족 — 이 영상은 다음에 파일을 다시 골라야 해요',3500);return}}catch(e){}
+  if(keepJob)keepJob.abort=true;const job={abort:false};keepJob=job;keepStore&&keepStore();
+  try{const fh=await dir.getFileHandle(vid(key)+'.part',{create:true}),w=await fh.createWritable();const rd=f.stream().getReader();let n=0,last=0;
+    for(;;){const {done,value}=await rd.read();if(done)break;if(job.abort||key!==vk){await w.abort();await dir.removeEntry(vid(key)+'.part').catch(()=>{});return}
+      await w.write(value);n+=value.length;const pc=Math.floor(n/f.size*100);if(pc>=last+20){last=pc;toast('바로 재생용 보관 '+pc+'%',1500)}}
+    await w.close();await fh.move?.(vid(key));if(!fh.move){const nf=await dir.getFileHandle(vid(key),{create:true}),w2=await nf.createWritable();await w2.write(await fh.getFile());await w2.close();await dir.removeEntry(vid(key)+'.part')}
+    upsertRecent({how:'o'});toast('보관 완료 — 다음엔 「최근」에서 누르면 바로 재생',2500);
+    const ks=recent.filter(r=>r.how==='o').map(r=>r.k);for(const k of ks.slice(3)){await dir.removeEntry(vid(k)).catch(()=>{});const r=recent.find(x=>x.k===k);if(r){r.how='';sv('sp_recent',recent)}}}
+  catch(e){toast('바로 재생용 보관 실패 — 다음엔 파일을 다시 골라 주세요',3000)}finally{if(keepJob===job)keepJob=null}}
+async function reopen(r){
+  const h=await idbGet(r.k+'|h');
+  if(h){try{if((await h.queryPermission({mode:'read'}))!=='granted'&&(await h.requestPermission({mode:'read'}))!=='granted')throw 0;const f=await h.getFile();return openVideo(f,{handle:h,key:f.name+'|'+f.size,keep:1})}catch(e){}}
+  const dir=await opfs();if(dir){try{const f=await (await dir.getFileHandle(vid(r.k))).getFile();return openVideo(f,{name:r.name,key:r.k,keep:1})}catch(e){}}
+  return false}
+async function dropVideo(k){await idbDel(k+'|h');const dir=await opfs();if(dir)await dir.removeEntry(vid(k)).catch(()=>{})}
+function openVideo(f,o){o=o||{};
   if(v.src)URL.revokeObjectURL(v.src);
   T={ko:[],en:[]};names={ko:'',en:''};off=0;setOff(0);clearAB();if(loop)setLoop();
-  v.src=URL.createObjectURL(f);vname=f.name;vk=f.name+'|'+f.size;window.__setFile&&window.__setFile(f);window.__onVideoOpen&&window.__onVideoOpen(vk);$('#nov').hidden=true;$('#mute').hidden=true;audioChecked=false;
+  v.src=URL.createObjectURL(f);vname=o.name||f.name;vk=o.key||(f.name+'|'+f.size);if(!o.keep)keepVideo(f,vk,o.handle);window.__setFile&&window.__setFile(f);window.__onVideoOpen&&window.__onVideoOpen(vk);$('#nov').hidden=true;$('#mute').hidden=true;audioChecked=false;
   rebuild();showName();setTab('sub');
   const r=recent.find(x=>x.k===vk);
   v.onloadedmetadata=()=>{v.playbackRate=speed;
     if(r&&r.pos>5&&r.pos<v.duration-5){v.currentTime=r.pos;toast('이어 보기 '+fmt(r.pos)+(r.subs&&r.subs.length?' · 자막 다시 고르세요':''),3000)}
-    else toast('자막을 고르세요 (이전 자막은 지웠어요)',2500);
+    else if(!T.en.length&&!T.ko.length)toast('자막을 고르거나 「생성」으로 만드세요',2500);
     upsertRecent({dur:v.duration});drawTicks()};
   v.play().catch(()=>{})}
 $('#fs').onchange=async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length)return;
@@ -273,10 +302,11 @@ function renderRecent(){const L=$('#list'),q=qn();const rs=recent.filter(r=>hit(
   $('#cnt').textContent=rs.length+'개';
   if(!rs.length){L.innerHTML='<div class="empty">'+(q?'검색 결과가 없어요':'본 영상이 여기에 쌓입니다.<br>줄을 누르고 같은 파일을 고르면 보던 곳부터 이어 봅니다.')+'</div>';return}
   L.innerHTML='';rs.forEach(r=>{const d=document.createElement('div');d.className='rc';const p=r.dur?Math.min(100,r.pos/r.dur*100):0;
-    d.innerHTML='<label><div class="n">'+hl(r.name,q)+'</div><div class="m">'+dt(r.at)+' · '+fmt(r.pos)+' / '+fmt(r.dur)+' ('+Math.round(p)+'%)'+(r.conv?' · 🔊변환됨':'')+(r.subs&&r.subs.length?' · 자막 '+esc(r.subs.join(', ')):'')+'</div><div class="pb"><i style="width:'+p+'%"></i></div><input type="file" accept="video/*,audio/*,.mkv,.avi"></label><button class="del">삭제</button>';
-    d.querySelector('input').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;if(f.name+'|'+f.size!==r.k)toast('다른 파일이에요 — 새로 엽니다',2500);openVideo(f)};
+    d.innerHTML='<label><div class="n">'+hl(r.name,q)+'</div><div class="m">'+dt(r.at)+' · '+fmt(r.pos)+' / '+fmt(r.dur)+' ('+Math.round(p)+'%)'+(r.how?' · ▶바로 재생':'')+(r.conv?' · 🔊변환됨':'')+(r.subs&&r.subs.length?' · 자막 '+esc(r.subs.join(', ')):'')+'</div><div class="pb"><i style="width:'+p+'%"></i></div><input type="file" accept="video/*,audio/*,.mkv,.avi"></label><button class="del">삭제</button>';
+    const inp=d.querySelector('input');inp.onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f)return;if(f.name+'|'+f.size!==r.k)toast('다른 파일이에요 — 새로 엽니다',2500);openVideo(f)};
+    if(r.how){inp.style.pointerEvents='none';d.querySelector('label').onclick=async()=>{toast('여는 중…',1200);if((await reopen(r))===false){toast('보관본이 없어요 — 파일을 한 번 골라 주세요',3000);inp.style.pointerEvents='';d.querySelector('label').onclick=null;inp.click()}}}
     const b=d.querySelector('.del');b.onclick=()=>{if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='삭제할까요?';setTimeout(()=>{b.classList.remove('arm');b.textContent='삭제'},3000);return}
-      recent=recent.filter(x=>x!==r);sv('sp_recent',recent);if(window.__idbDel)window.__idbDel(r.k);renderRecent();toast('목록에서 지움 (영상 파일은 그대로)')};
+      recent=recent.filter(x=>x!==r);sv('sp_recent',recent);if(window.__idbDel)window.__idbDel(r.k);dropVideo(r.k);renderRecent();toast('목록·앱 보관본 지움 (원본 영상 파일은 그대로)')};
     L.appendChild(d)})}
 function setTab(t){tab=t;$('#tSub').classList.toggle('tog',t==='sub');$('#tRec').classList.toggle('tog',t==='rec');t==='sub'?renderList():renderRecent();if(t==='sub')markCur()}
 $('#tSub').onclick=()=>setTab('sub');$('#tRec').onclick=()=>setTab('rec');
@@ -337,7 +367,10 @@ const applyColors=()=>{document.documentElement.style.setProperty('--cc',cc);doc
 chips('#ccs',[['흰','#ffffff'],['노','#ffe14d'],['주','#ffab40'],['초','#69f0ae']],()=>cc,c=>{cc=c;sv('sp_cc',c);applyColors()});
 chips('#hls',[['주','#ff9a3c'],['초','#4cd964'],['노','#ffd400'],['파','#5aa9ff']],()=>hlc,c=>{hlc=c;sv('sp_hl',c);applyColors()});
 applyColors();
-$('#cHide').onclick=()=>{hide=!hide;capKey='';$('#cHide').textContent=hide?'자막 켜기':'자막 끄기';$('#cHide').classList.toggle('tog',hide)};
+const setHide=h=>{hide=h;sv('sp_hide',h);capKey='';$('#cHide').textContent=hide?'자막 켜기':'자막 끄기';$('#cHide').classList.toggle('tog',hide);$('#cCap').classList.toggle('tog',!hide);$('#cCap').textContent=hide?'자막 꺼짐':'자막'};
+$('#cHide').onclick=()=>{setHide(!hide);toast(hide?'영상 위 자막 숨김':'영상 위 자막 보임')};$('#cCap').onclick=$('#cHide').onclick;setHide(ld('sp_hide',false));
+let lf=ld('sp_lf',innerWidth>=700?15:12);const setLf=d=>{lf=Math.min(26,Math.max(10,lf+d));sv('sp_lf',lf);document.documentElement.style.setProperty('--lf',lf+'px');$('#lS').textContent=lf};
+$('#lSm').onclick=()=>setLf(-1);$('#lSp').onclick=()=>setLf(1);setLf(0);
 $('#cMore').onclick=()=>{$('#more').hidden=!$('#more').hidden;$('#cMore').classList.toggle('tog',!$('#more').hidden)};
 $('#cKey').onclick=()=>$('#keys').hidden=!$('#keys').hidden;
 const fs=()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen?.().catch(()=>toast('전체화면 불가'))};
@@ -345,7 +378,7 @@ $('#bFs').onclick=fs;
 document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;const k=e.key;
   if(k===' '){e.preventDefault();toggle()}else if(k==='ArrowLeft'){e.preventDefault();e.shiftKey?v.currentTime-=5:prevCue()}else if(k==='ArrowRight'){e.preventDefault();e.shiftKey?v.currentTime+=5:nextCue()}
   else if(k===',')prevCue();else if(k==='.')nextCue();else if(k==='r'||k==='R')setLoop();else if(k==='b'||k==='B')setAB();
-  else if(k==='1')setMode('ko');else if(k==='2')setMode('en');else if(k==='3')setMode('both');else if(k==='f'||k==='F')fs()});
+  else if(k==='1')setMode('ko');else if(k==='2')setMode('en');else if(k==='3')setMode('both');else if(k==='f'||k==='F')fs();else if(k==='c'||k==='C')$('#cHide').click()});
 // ---- 변환한 소리·내장 자막 (폰 안에서, ffmpeg.wasm) ----
 import {FFmpeg} from './ffmpeg/index.js';
 const au=$('#au');let ext=null,extBlob=null,amap=null,aoff=ld('sp_aoff',0),ff=null,ffBusy=false,cvTimer=0,cancelReq=false;
@@ -525,7 +558,7 @@ async function saveSubs(auto){if(!T.ko.length&&!T.en.length)return toast('저장
   const out=[];if(T.en.length)out.push([y+'_'+nm+'_영어.srt',toSrt(sh(T.en))]);if(T.ko.length)out.push([y+'_'+nm+'_한글.srt',toSrt(sh(T.ko))]);
   for(const [n,t] of out){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+t],{type:'application/x-subrip'}));a.download=n;document.body.appendChild(a);a.click();a.remove();await new Promise(r=>setTimeout(r,400))}
   toast((auto===true?'백업 · srt ':'')+out.length+'개 저장 → 다운로드 폴더'+(off?' (싱크 '+off.toFixed(1)+'초 반영)':''),3000)}
-$('#sSave').onclick=saveSubs;
+$('#sSave').onclick=saveSubs;$('#gSrt').onclick=saveSubs;
 $('#aSave').onclick=()=>{if(!extBlob)return;const d=new Date(),y=String(d.getFullYear()).slice(2)+p2(d.getMonth()+1)+p2(d.getDate());
   const a=document.createElement('a');a.href=ext;a.download=y+'_'+vname.replace(/\.[^.]+$/,'')+'_소리.m4a';document.body.appendChild(a);a.click();a.remove();toast('소리 파일 저장 → 다운로드 폴더',2500)};
 
