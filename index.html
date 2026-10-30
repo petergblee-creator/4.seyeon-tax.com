@@ -72,7 +72,7 @@ body{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset
 #gPb{position:relative;flex:1 1 140px;height:22px;background:var(--line);border-radius:8px;overflow:hidden}
 #gPb i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--acc);transition:width .3s}
 #gPt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;text-shadow:0 0 3px #000;white-space:nowrap;overflow:hidden;padding:0 6px}
-#gKeyCh.arm{background:#c0392b;color:#fff;border-color:#c0392b}
+#gKeyCh.arm,#cKeyCh.arm{background:#c0392b;color:#fff;border-color:#c0392b}
 .pick.sm2{position:relative;overflow:hidden;display:inline-block;border:1px solid var(--line);border-radius:8px;padding:6px 8px;cursor:pointer;background:var(--card)}
 .pick.sm2 input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
 #stInfo{color:var(--sub)}
@@ -127,10 +127,11 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
       </div>
       <div id="gen" hidden>
         <div class="grow"><span id="gSrc" class="gs"></span></div>
-        <div class="grow"><span class="gs">원어</span><span class="seg"><button id="gEn">영</button><button id="gJa">일</button></span><button id="gTr" title="받아쓴 뒤 한국어로 번역">번역</button></div>
+        <div class="grow"><span class="gs">원어</span><span class="seg"><button id="gEn">영</button><button id="gJa">일</button></span><button id="gTr" title="받아쓴 뒤 한국어로 번역">번역</button><span class="gs">엔진</span><span class="seg"><button id="eGq">Groq</button><button id="eCl">Claude</button></span></div>
+        <div class="grow" id="cKeyRow" hidden><input id="cKeyIn" type="password" placeholder="Claude API 키 (sk-ant-…) 붙여넣기" autocomplete="off"><button id="cKeySv">저장</button><a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">키 받기 ↗</a></div>
         <div class="grow" id="gKeyRow"><input id="gKey" type="password" placeholder="Groq 키 (gsk_…) 붙여넣기" autocomplete="off"><button id="gKeySv">저장</button><a href="https://console.groq.com/keys" target="_blank" rel="noopener">키 받기 ↗</a></div>
         <div class="grow"><button id="gGo" class="tog">시작</button><button id="gTrOnly" hidden>번역만</button><div id="gPb"><i></i><b id="gPt">대기</b></div></div>
-        <div class="grow"><span class="gs">만든 자막은 자동 저장 · 파일로는 ⋯ → 「자막 저장」</span><button id="gKeyCh" hidden>키 지우기</button></div>
+        <div class="grow"><span class="gs">만든 자막은 자동 저장 · 파일로는 ⋯ → 「자막 저장」</span><button id="gKeyCh" hidden>Groq 키 지우기</button><button id="cKeyCh" hidden>Claude 키 지우기</button></div>
       </div>
       <div class="row">
         <button id="cP">▶</button><button id="cB">-5</button><button id="cF">+5</button>
@@ -531,7 +532,8 @@ $('#aSave').onclick=()=>{if(!extBlob)return;const d=new Date(),y=String(d.getFul
 // ================= 자막 생성: 영어 받아쓰기(Groq Whisper large-v3) + 한글 번역(Groq) =================
 // 소리는 ffmpeg로 10분 조각(16kHz 모노 m4a)만 만들어 보냄 → 변환해 둔 소리가 있으면 그걸 씀(빠름)
 let gkey=ld('sp_gkey',''),gTrOn=ld('sp_gtr',true),gLang=ld('sp_glang','en'),genRun=false,genCtl=null,isGen=false;
-const TRM=['llama-3.3-70b-versatile','openai/gpt-oss-120b','qwen/qwen3-32b'];let trM=ld('sp_trm',0);
+const TRM=['llama-3.3-70b-versatile','openai/gpt-oss-120b','qwen/qwen3-32b'];let trM=ld('sp_trm',0),ckey=ld('sp_ckey',''),eng=ld('sp_eng','groq');
+const CLM=['claude-sonnet-5-5','claude-haiku-5-5'];
 function toggleGen(){const g=$('#gen');g.hidden=!g.hidden;$('#bGen').classList.toggle('tog',!g.hidden);sv('sp_genopen',!g.hidden);genUI()}
 $('#bGen').onclick=toggleGen;if(ld('sp_genopen',false)){$('#gen').hidden=false;$('#bGen').classList.add('tog')}
 const setGL=l=>{gLang=l;sv('sp_glang',l);$('#gEn').classList.toggle('tog',l==='en');$('#gJa').classList.toggle('tog',l==='ja')};
@@ -540,7 +542,18 @@ $('#gTr').onclick=()=>{gTrOn=!gTrOn;sv('sp_gtr',gTrOn);genUI();toast(gTrOn?'받�
 $('#gKeySv').onclick=()=>{const k=$('#gKey').value.trim();if(!/^gsk_/.test(k))return toast('gsk_ 로 시작하는 키를 붙여넣으세요',2500);gkey=k;sv('sp_gkey',k);$('#gKey').value='';genUI();toast('키 저장 (이 폰 브라우저에만)')};
 $('#gKeyCh').onclick=()=>{const b=$('#gKeyCh');if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='지울까요?';setTimeout(()=>{b.classList.remove('arm');b.textContent='키 지우기'},3000);return}
   gkey='';sv('sp_gkey','');b.classList.remove('arm');b.textContent='키 지우기';genUI();toast('키 지움')};
-function genUI(){$('#gKeyRow').hidden=!!gkey;$('#gKeyCh').hidden=!gkey;$('#gTr').classList.toggle('tog',gTrOn);
+$('#eGq').onclick=()=>{eng='groq';sv('sp_eng',eng);genUI();toast('번역: Groq (무료)')};
+$('#eCl').onclick=()=>{eng='claude';sv('sp_eng',eng);genUI();toast(ckey?'번역: Claude':'Claude 키를 붙여넣으세요',2500)};
+$('#cKeySv').onclick=()=>{const k=$('#cKeyIn').value.trim();if(!/^sk-ant-/.test(k))return toast('sk-ant- 로 시작하는 키를 붙여넣으세요',2500);ckey=k;sv('sp_ckey',k);$('#cKeyIn').value='';genUI();toast('Claude 키 저장 (이 폰 브라우저에만)')};
+$('#cKeyCh').onclick=()=>{const b=$('#cKeyCh');if(!b.classList.contains('arm')){b.classList.add('arm');b.textContent='지울까요?';setTimeout(()=>{b.classList.remove('arm');b.textContent='Claude 키 지우기'},3000);return}ckey='';sv('sp_ckey','');b.classList.remove('arm');b.textContent='Claude 키 지우기';genUI();toast('Claude 키 지움')};
+async function claudeAsk(p,sig){for(let tr=0;tr<4;tr++){let r;
+  try{r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',signal:sig,headers:{'x-api-key':ckey,'anthropic-version':'2023-06-01','content-type':'application/json','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:CLM[tr>=2?1:0],max_tokens:4096,messages:[{role:'user',content:p}]})})}
+  catch(e){if(e.name==='AbortError')throw e;throw {code:'net'}}
+  if(r.ok){const j=await r.json();return (j.content||[]).map(c=>c.text||'').join('')}
+  if(r.status===429||r.status>=500){gp(-1,'Claude 잠시 대기 후 다시…');await sleep(15000*(tr+1),sig);continue}
+  const t=await r.text().catch(()=>'');if(r.status===401)throw {code:401,claude:1};if(r.status===404||(r.status===400&&/model/i.test(t))){continue}throw {code:r.status,msg:t.slice(0,200)}}
+  throw {code:429}}
+function genUI(){$('#gKeyRow').hidden=!!gkey;$('#gKeyCh').hidden=!gkey;$('#cKeyCh').hidden=!ckey;$('#cKeyRow').hidden=!(eng==='claude'&&!ckey);$('#eGq').classList.toggle('tog',eng==='groq');$('#eCl').classList.toggle('tog',eng==='claude');$('#gTr').classList.toggle('tog',gTrOn);
   $('#gGo').textContent=genRun?'중지':'시작';$('#gGo').classList.toggle('tog',!genRun);
   $('#gTrOnly').hidden=genRun||!(T.en.length&&!T.ko.length);
   $('#gSrc').textContent=!vk?'먼저 「영상」을 고르세요':(extBlob?'소리: 변환해 둔 소리 (빠름)':'소리: 열린 영상');
@@ -561,7 +574,7 @@ function splitSeg(s,e,x){x=x.replace(/\s+/g,' ').trim();if(x.length<=84)return [
   const parts=x.split(/(?<=[.?!])\s+/),g=[];let cur='';for(const p of parts){if(cur&&(cur+' '+p).length>84){g.push(cur);cur=p}else cur=cur?cur+' '+p:p}if(cur)g.push(cur);
   const tot=g.reduce((a,b)=>a+b.length,0),out=[];let t=s;for(const q of g){const d=(e-s)*q.length/tot;out.push({s:t,e:t+d,x:q});t+=d}return out}
 function errMsg(e){if(e&&e.code==='net')return '인터넷 연결 확인 — Groq 서버에 닿지 못했어요';
-  if(e&&e.code===401)return '키가 맞지 않아요 — 「키 지우기」 후 다시 붙여넣기';if(e&&e.code===413)return '조각이 너무 커요';if(e&&e.code===429)return 'Groq 사용 한도 — 잠시 뒤 「이어서」';
+  if(e&&e.code===401)return (e.claude?'Claude':'Groq')+' 키가 맞지 않아요 — 「키 지우기」 후 다시 붙여넣기';if(e&&e.code===413)return '조각이 너무 커요';if(e&&e.code===429)return 'Groq 사용 한도 — 잠시 뒤 「이어서」';
   return '오류: '+(e&&(e.msg||e.code||e.message)||e)}
 async function genSave(job){if(!vk)return;await idbPut(vk+'|gen',JSON.stringify({en:T.en,ko:T.ko,lang:gLang,at:Date.now()}));if(job)await idbPut(vk+'|gj',job)}
 window.__genLoad=async key=>{const s=await idbGet(key+'|gen');if(!s||key!==vk||T.en.length||T.ko.length)return false;
@@ -574,8 +587,8 @@ async function trBatch(i0,i1,sig){const lines=T.en.slice(i0,i1).map(c=>c.x);if(!
   const p='다음은 영상 「'+showTitle()+'」의 '+(gLang==='ja'?'일본어':'영어')+' 자막 '+lines.length+'줄입니다. 각 줄을 자연스러운 한국어 자막체(짧은 구어체, 인물 관계에 맞는 존댓말·반말, 고유명사는 통용 표기)로 번역하세요.\n'+
     (ctx.length?'앞 대사(참고만, 번역하지 말 것): '+JSON.stringify(ctx)+'\n':'')+'줄 수와 순서를 그대로 유지하고, 한국어 문자열 '+lines.length+'개짜리 JSON 배열만 출력하세요.\n'+JSON.stringify(lines);
   for(let tr=0;tr<TRM.length+1;tr++){
-    try{const j=await groq('chat/completions',JSON.stringify({model:TRM[trM%TRM.length],temperature:0.2,messages:[{role:'user',content:p}]}),sig,true);
-      const t=j.choices[0].message.content||'';const arr=JSON.parse(t.slice(t.indexOf('['),t.lastIndexOf(']')+1));
+    try{let t;if(eng==='claude'&&ckey)t=await claudeAsk(p,sig);else{const j=await groq('chat/completions',JSON.stringify({model:TRM[trM%TRM.length],temperature:0.2,messages:[{role:'user',content:p}]}),sig,true);t=j.choices[0].message.content||''}
+      const arr=JSON.parse(t.slice(t.indexOf('['),t.lastIndexOf(']')+1));
       if(Array.isArray(arr)){const ko=T.ko.slice();for(let k=0;k<lines.length;k++){const x=arr[k]!=null?String(arr[k]).trim():'';if(x){const c=T.en[i0+k];ko.push({s:c.s,e:c.e,x})}}
         T.ko=ko.sort((a,b)=>a.s-b.s);names.ko='만든 번역';return true}}
     catch(e){if(e&&e.name==='AbortError')throw e;if(e&&(e.code===400||e.code===404)&&/model/i.test(e.msg||'')){trM++;sv('sp_trm',trM)}else if(e&&e.code===401)throw e}}
@@ -629,7 +642,7 @@ async function startGen(){if(!vk||!curFile)return toast('먼저 「영상」을 
 let armT=0;function armOK(){if(Date.now()-armT<3000){armT=0;return true}armT=Date.now();toast('지금 자막을 새로 만든 자막으로 바꿉니다 — 「시작」을 한 번 더',3000);return false}
 function stopGen(){cancelReq=true;if(genCtl)genCtl.abort();try{ff&&ff.terminate()}catch(e){}}
 $('#gGo').onclick=()=>genRun?stopGen():startGen();
-$('#gTrOnly').onclick=async()=>{if(!gkey)return toast('Groq 키가 필요해요',2500);genRun=true;genCtl=new AbortController();genUI();T.ko=[];
+$('#gTrOnly').onclick=async()=>{if(eng==='claude'?!ckey:!gkey)return toast((eng==='claude'?'Claude':'Groq')+' 키가 필요해요',2500);genRun=true;genCtl=new AbortController();genUI();T.ko=[];
   try{await translateFrom(0,genCtl.signal,0,1);await genSave();gp(1,'번역 완료 · '+T.ko.length+'줄');if(mode!=='both')setMode('both')}
   catch(e){gp(0,e&&e.name==='AbortError'?'중지함':errMsg(e))}finally{genRun=false;genCtl=null;genUI();rebuild()}};
 {const x0=$('#cvX').onclick;$('#cvX').onclick=()=>{if(genRun)stopGen();else x0()}}
