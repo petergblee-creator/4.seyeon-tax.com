@@ -103,6 +103,18 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
 @keyframes fl{50%{background:transparent;color:inherit}}
 .empty{padding:24px 12px;color:var(--sub);text-align:center}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:8px 14px;border-radius:20px;z-index:30;max-width:90vw;text-align:center}
+/* 접은 화면·반쪽 화면(폭 700 미만): 영상 작게, 생성 창 1줄로 접기, 버튼 작게 → 아래 자막 목록이 보이게 */
+#gFold{display:none}
+@media(max-width:699px){
+  #top{flex-wrap:nowrap;gap:3px;padding:4px 6px}#top .pick{padding:5px 9px}#top button{padding:5px 7px;min-width:30px}#fname{font-size:11px}
+  #stage video{max-height:30vh}
+  #left{flex:none}#side{min-height:38vh}
+  #bar{padding:4px 8px 2px}#tx{margin-top:2px;font-size:11px}
+  #left>.row{gap:3px;padding:3px 6px}#left>.row button{padding:4px 6px;min-width:30px}
+  #gen{margin:2px 6px 3px;padding:4px;gap:4px}
+  #gFold{display:inline-block}
+  #gen.mini>.grow{display:none}#gen.mini>.grow.keep{display:flex}
+}
 @media (prefers-reduced-motion: reduce){mark{animation:none}}
 </style>
 
@@ -134,7 +146,7 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
         <div class="grow"><span class="gs">원어</span><span class="seg"><button id="gEn">영</button><button id="gJa">일</button></span><button id="gTr" title="받아쓴 뒤 한국어로 번역">번역</button><span class="gs">엔진</span><span class="seg"><button id="eGq">Groq</button><button id="eCl">Claude</button></span></div>
         <div class="grow" id="cKeyRow" hidden><input id="cKeyIn" type="password" placeholder="Claude API 키 (sk-ant-…) 붙여넣기" autocomplete="off"><button id="cKeySv">저장</button><a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">키 받기 ↗</a></div>
         <div class="grow" id="gKeyRow"><input id="gKey" type="password" placeholder="Groq 키 (gsk_…) 붙여넣기" autocomplete="off"><button id="gKeySv">저장</button><a href="https://console.groq.com/keys" target="_blank" rel="noopener">키 받기 ↗</a></div>
-        <div class="grow"><button id="gGo" class="tog">시작</button><button id="gTrOnly" hidden>번역만</button><div id="gPb"><i></i><b id="gPt">대기</b></div></div>
+        <div class="grow keep"><button id="gFold" title="생성 창 펼치기/접기">▾</button><button id="gGo" class="tog">시작</button><button id="gTrOnly" hidden>번역만</button><div id="gPb"><i></i><b id="gPt">대기</b></div></div>
         <div class="grow"><span class="gs">저장은 자동 — 앱 안 보관 + 완성 때 다운로드 폴더에 srt 자동 · 다시 받으려면 →</span><button id="gSrt">srt 저장</button><button id="gKeyCh" hidden>Groq 키 지우기</button><button id="cKeyCh" hidden>Claude 키 지우기</button></div>
       </div>
       <div class="row">
@@ -568,7 +580,9 @@ let gkey=ld('sp_gkey',''),gTrOn=ld('sp_gtr',true),gLang=ld('sp_glang','en'),genR
 const TRM=['llama-3.3-70b-versatile','openai/gpt-oss-120b','qwen/qwen3-32b'];let trM=ld('sp_trm',0),ckey=ld('sp_ckey',''),eng=ld('sp_eng','groq');
 const CLM=['claude-sonnet-5-5','claude-haiku-5-5'];
 function toggleGen(){const g=$('#gen');g.hidden=!g.hidden;$('#bGen').classList.toggle('tog',!g.hidden);sv('sp_genopen',!g.hidden);genUI()}
-$('#bGen').onclick=toggleGen;if(ld('sp_genopen',false)){$('#gen').hidden=false;$('#bGen').classList.add('tog')}
+$('#bGen').onclick=toggleGen;
+let genMini=ld('sp_genmini',true);const applyMini=()=>{$('#gen').classList.toggle('mini',genMini);$('#gFold').textContent=genMini?'▾':'▴';$('#gFold').title=genMini?'생성 창 펼치기':'생성 창 접기'};applyMini();
+$('#gFold').onclick=()=>{genMini=!genMini;sv('sp_genmini',genMini);applyMini()};if(ld('sp_genopen',false)){$('#gen').hidden=false;$('#bGen').classList.add('tog')}
 const setGL=l=>{gLang=l;sv('sp_glang',l);$('#gEn').classList.toggle('tog',l==='en');$('#gJa').classList.toggle('tog',l==='ja')};
 $('#gEn').onclick=()=>setGL('en');$('#gJa').onclick=()=>setGL('ja');setGL(gLang);
 $('#gTr').onclick=()=>{gTrOn=!gTrOn;sv('sp_gtr',gTrOn);genUI();toast(gTrOn?'받아쓴 뒤 한글 번역까지':'영어 받아쓰기만')};
@@ -638,7 +652,7 @@ async function chunkAudio(i,LEN,useExt,onP){const inp=await ffReady();let src=in
   const d=await ff.readFile('/g.m4a');try{await ff.deleteFile('/g.m4a')}catch(e){}return new Blob([d.buffer],{type:'audio/mp4'})}
 
 async function startGen(){if(!vk||!curFile)return toast('먼저 「영상」을 고르세요',2500);
-  if(!gkey){$('#gen').hidden=false;$('#gKey').focus();return toast('Groq 키를 먼저 붙여넣고 저장하세요',2500)}
+  if(!gkey){$('#gen').hidden=false;genMini=false;applyMini();$('#gKey').focus();return toast('Groq 키를 먼저 붙여넣고 저장하세요',2500)}
   if(ffBusy)return toast('소리 변환이 끝난 뒤에 해 주세요',2500);
   let job=await idbGet(vk+'|gj');if(job&&job.fin)job=null;
   if(!job&&T.en.length&&!isGen&&!armOK())return;
