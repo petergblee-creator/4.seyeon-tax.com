@@ -103,6 +103,10 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
 @keyframes fl{50%{background:transparent;color:inherit}}
 .empty{padding:24px 12px;color:var(--sub);text-align:center}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:8px 14px;border-radius:20px;z-index:30;max-width:90vw;text-align:center}
+/* 듣기 모드(기본): 위 버튼줄·생성 창·조작 버튼·검색줄을 접고 영상·시간 막대·자막 목록만. 영상 오른쪽 위 ⋯로 펼침 */
+#uiBox{position:absolute;top:6px;right:6px;z-index:3;display:flex;gap:4px}
+#uiBox button{background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.35);padding:4px 10px;font-size:15px;line-height:1.1;min-width:38px}
+body.lite #top,body.lite #gen,body.lite #left>.row,body.lite #keys,body.lite #sbar{display:none!important}
 /* 접은 화면·반쪽 화면(폭 700 미만): 영상 작게, 생성 창 1줄로 접기, 버튼 작게 → 아래 자막 목록이 보이게 */
 #gFold{display:none}
 @media(max-width:699px){
@@ -136,6 +140,7 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
         <div id="mute" hidden><div style="flex:1"><span id="muteTx"></span><div class="g"><button id="muteFix">소리 살리기</button><button id="muteResume" hidden>이어서 변환</button><button id="muteSub">내장 자막 꺼내기</button><button id="muteX">닫기</button></div></div></div>
         <div id="conv" hidden><div class="r"><b id="cvT">소리 변환 준비 중…</b><button id="cvX">취소</button></div><div class="pb"><i id="cvB"></i></div><div class="r"><span id="cvL"></span><span id="cvR"></span></div></div>
         <div id="cap"></div>
+        <div id="uiBox"><button id="uiFs" title="전체화면">⛶</button><button id="uiTog" title="버튼 펼치기/접기">⋯</button></div>
       </div>
       <div id="bar">
         <div id="tk"><div id="fill"></div><div id="ticks"></div><div id="abr" hidden></div><div id="pct">0%</div></div>
@@ -164,7 +169,7 @@ mark{background:#ffd400;color:#000;animation:fl .5s 6}
         <button id="cHide">자막 끄기</button><button id="cKey">key</button>
         <span class="lb" id="stInfo"></span><button id="stKeep">보관 고정</button>
       </div>
-      <div id="keys" hidden>스페이스 재생/정지 · ←/→ 이전/다음 자막 (,/. 도 같음) · Shift+←/→ 5초 · R 자막 반복 · B 구간 A-B · 1/2/3 한/영/둘 · G 자막 생성 창 · C 영상 위 자막 보이기/숨기기 · F 전체화면 · 「최근」 줄 누르기 = 바로 재생 · 영상 두 번 탭 = 영상만 크게</div>
+      <div id="keys" hidden>스페이스 재생/정지 · ←/→ 이전/다음 자막 (,/. 도 같음) · Shift+←/→ 5초 · R 자막 반복 · B 구간 A-B · 1/2/3 한/영/둘 · G 자막 생성 창 · C 영상 위 자막 보이기/숨기기 · F 전체화면 · U 버튼 접기/펼치기(영상 오른쪽 위 ⋯) · 「최근」 줄 누르기 = 바로 재생 · 영상 두 번 탭 = 영상만 크게</div>
     </div>
     <div id="side">
       <div id="sbar"><span class="seg"><button id="tSub" class="tog">자막</button><button id="tRec">최근</button></span><input id="q" placeholder="🔍 검색 (초성 가능)"><span id="cnt"></span></div>
@@ -387,10 +392,15 @@ $('#cMore').onclick=()=>{$('#more').hidden=!$('#more').hidden;$('#cMore').classL
 $('#cKey').onclick=()=>$('#keys').hidden=!$('#keys').hidden;
 const fs=()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen?.().catch(()=>toast('전체화면 불가'))};
 $('#bFs').onclick=fs;
+// ---- 듣기 모드: 버튼들 접기/펼치기 (기본 접힘, 상태 기억) ----
+let lite=ld('sp_lite',true);const applyLite=()=>{document.body.classList.toggle('lite',lite);$('#uiTog').textContent=lite?'⋯':'▴';$('#uiTog').title=lite?'버튼 펼치기':'버튼 접기'};applyLite();
+$('#uiTog').onclick=e=>{e.stopPropagation();lite=!lite;sv('sp_lite',lite);applyLite()};
+$('#uiFs').onclick=e=>{e.stopPropagation();fs()};
+
 document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;const k=e.key;
   if(k===' '){e.preventDefault();toggle()}else if(k==='ArrowLeft'){e.preventDefault();e.shiftKey?v.currentTime-=5:prevCue()}else if(k==='ArrowRight'){e.preventDefault();e.shiftKey?v.currentTime+=5:nextCue()}
   else if(k===',')prevCue();else if(k==='.')nextCue();else if(k==='r'||k==='R')setLoop();else if(k==='b'||k==='B')setAB();
-  else if(k==='1')setMode('ko');else if(k==='2')setMode('en');else if(k==='3')setMode('both');else if(k==='f'||k==='F')fs();else if(k==='c'||k==='C')$('#cHide').click()});
+  else if(k==='1')setMode('ko');else if(k==='2')setMode('en');else if(k==='3')setMode('both');else if(k==='f'||k==='F')fs();else if(k==='c'||k==='C')$('#cHide').click();else if(k==='u'||k==='U')$('#uiTog').click()});
 // ---- 변환한 소리·내장 자막 (폰 안에서, ffmpeg.wasm) ----
 import {FFmpeg} from './ffmpeg/index.js';
 const au=$('#au');let ext=null,extBlob=null,amap=null,aoff=ld('sp_aoff',0),ff=null,ffBusy=false,cvTimer=0,cancelReq=false;
